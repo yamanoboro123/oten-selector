@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>お店セレクター</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --card: #fff; --ink: #2b2b2b; --sub: #6b6b6b;
+    --line: #e3e0d8; --accent: #b5552e; --accent-soft: #f0e3da;
+    --ok: #2f7d52; --warn: #b07e16; --star: #e6a817; --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    padding: 22px 20px 14px; border-bottom: 1px solid var(--line);
+    background: var(--card); position: sticky; top: 0; z-index: 10;
+  }
+  h1 { margin: 0; font-size: 20px; letter-spacing: .04em; }
+  .count { color: var(--sub); font-size: 13px; margin-top: 2px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 14px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; padding: 6px 14px; font-size: 13px; cursor: pointer; color: var(--sub); }
+  .seg button.active { background: var(--accent); color: #fff; }
+  label.chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; color: var(--ink); }
+  input[type="search"] {
+    flex: 1; min-width: 160px; padding: 7px 12px; border: 1px solid var(--line);
+    border-radius: 999px; font-size: 14px; background: var(--bg);
+  }
+  .mini-btn { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--ink); }
+  .mini-btn:hover { background: var(--accent-soft); }
+  main { max-width: 1100px; margin: 0 auto; padding: 18px 16px 60px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .card.hidden-shop { opacity: .55; background: #efeee9; }
+  .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card .name { font-size: 16px; font-weight: 700; color: var(--ink); text-decoration: none; }
+  .card .name:hover { color: var(--accent); text-decoration: underline; }
+  .right-top { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .area { font-size: 11px; color: #fff; background: var(--accent); padding: 2px 8px; border-radius: 999px; }
+  .star-btn { border: 0; background: none; cursor: pointer; font-size: 18px; line-height: 1; color: #ccc; padding: 0; }
+  .star-btn.on { color: var(--star); }
+  .meta { font-size: 12.5px; color: var(--sub); }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { font-size: 11.5px; padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
+  .badge.ok { background: #e3f1e9; color: var(--ok); }
+  .badge.no { background: #f0ece4; color: var(--sub); }
+  .stars { color: var(--warn); font-size: 13px; letter-spacing: 1px; }
+  .stars .tabelog { color: #c8460f; font-weight: 700; letter-spacing: 0; }
+  .badge.genre { background: var(--accent); color: #fff; font-weight: 700; }
+  .map { width: 100%; height: 150px; border: 0; border-radius: 10px; margin-top: 2px; background: #e9e7e1; }
+  .sel { padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; background: var(--bg); color: var(--ink); cursor: pointer; }
+  .overlay { position: fixed; inset: 0; background: rgba(20,18,14,.55); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .dialog { background: var(--card); border-radius: var(--radius); padding: 22px; width: 360px; max-width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  .dialog.wide { width: 560px; max-height: 90vh; overflow: auto; }
+  .dialog input, .dialog textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; font-family: inherit; background: var(--bg); color: var(--ink); }
+  .dialog textarea { min-height: 60px; resize: vertical; margin-top: 8px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .form-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--sub); }
+  .chk-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; }
+  .lastvisit { font-size: 12px; color: var(--ok); font-weight: 600; }
+  .memo { font-size: 12.5px; color: #555; border-top: 1px dashed var(--line); padding-top: 8px; white-space: pre-wrap; }
+  .visits { font-size: 12px; color: #555; border-top: 1px dashed var(--line); padding-top: 8px; }
+  .visits ul { margin: 4px 0 0; padding-left: 18px; }
+  .visits li.local { color: var(--accent); }
+  .tag-unsaved { font-size: 10px; background: var(--accent); color: #fff; border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+  .reason { font-size: 12px; color: #a23; font-weight: 600; }
+  .links a { font-size: 12px; color: var(--accent); }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px dashed var(--line); padding-top: 8px; }
+  .vform { display: none; flex-direction: column; gap: 6px; border-top: 1px dashed var(--line); padding-top: 8px; }
+  .vform.open { display: flex; }
+  .vform input[type="date"] { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+  .vform textarea { width: 100%; min-height: 52px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; }
+  .empty { text-align: center; color: var(--sub); padding: 60px 0; }
+  .toggle-row { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>お店セレクター</h1>
+  <div class="count" id="count">読み込み中…</div>
+  <div class="filters">
+    <div class="seg" id="area-seg"><!-- 動的生成 --></div>
+    <div class="seg" id="subarea-seg" style="display:none"><!-- 名古屋など選択時に動的生成 --></div>
+    <div class="seg" id="meal-seg">
+      <button data-meal="" class="active">全時間帯</button>
+      <button data-meal="morning">朝</button>
+      <button data-meal="lunch">昼</button>
+      <button data-meal="dinner">夜</button>
+      <button data-meal="takeout">テイクアウト</button>
+    </div>
+    <select id="budget-sel" class="sel" title="予算で絞る">
+      <option value="">予算: 全部</option>
+      <option value="0-1999">〜¥2,000</option>
+      <option value="2000-3999">¥2,000〜4,000</option>
+      <option value="4000-5999">¥4,000〜6,000</option>
+      <option value="6000-9999">¥6,000〜1万</option>
+      <option value="10000-">¥1万〜</option>
+    </select>
+    <select id="genre-sel" class="sel" title="ジャンルで絞る"><option value="">ジャンル: 全部</option></select>
+    <label class="chk"><input type="checkbox" id="f-fav" /> ★お気に入り</label>
+    <label class="chk"><input type="checkbox" id="f-private" /> 個室あり</label>
+    <label class="chk"><input type="checkbox" id="f-kids" /> 子連れOK</label>
+    <label class="chk"><input type="checkbox" id="f-parking" /> 駐車場あり</label>
+    <label class="chk"><input type="checkbox" id="f-visited" /> 訪問済み</label>
+    <input type="search" id="q" placeholder="店名・ジャンル・タグで検索" />
+    <div class="toggle-row">
+      <label class="chk"><input type="checkbox" id="f-showhidden" /> 非掲載も表示</label>
+      <button class="mini-btn" id="add-btn" title="新しい店を追加">＋ 店を追加</button>
+      <button class="mini-btn" id="export-btn" title="localStorageの変更をJSON保存">エクスポート</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" style="display:none">条件に合うお店がありません。</div>
+</main>
+
+<!-- パスワードゲート（暗号公開時のみ表示） -->
+<div id="gate" class="overlay" style="display:none">
+  <div class="dialog">
+    <h2 style="margin-top:0">🔒 お店セレクター</h2>
+    <p class="meta">閲覧にはパスワードが必要です。</p>
+    <input type="password" id="gate-pw" placeholder="パスワード" autocomplete="current-password" />
+    <div id="gate-err" class="reason" style="display:none">パスワードが違います。</div>
+    <button class="mini-btn" id="gate-ok" style="margin-top:8px">開く</button>
+  </div>
+</div>
+
+<!-- 店追加フォーム -->
+<div id="add-modal" class="overlay" style="display:none">
+  <div class="dialog wide">
+    <h2 id="add-title" style="margin-top:0">店を追加</h2>
+    <div class="form-grid">
+      <label>店名 <input data-k="name" /></label>
+      <label>エリア <input data-k="area" placeholder="名古屋 / 桑名 など" /></label>
+      <label>サブエリア <input data-k="subarea" placeholder="名駅 など（任意）" /></label>
+      <label>ジャンル <input data-k="genre" placeholder="寿司、海鮮" /></label>
+      <label>予算 <input data-k="budget" placeholder="¥4,000〜6,000" /></label>
+      <label>駅徒歩 <input data-k="station_walk" placeholder="徒歩5分" /></label>
+      <label>食べログ/公式URL <input data-k="url" placeholder="https://tabelog.com/..." /></label>
+      <label>住所 <input data-k="address" placeholder="地図用（任意）" /></label>
+      <label>タグ <input data-k="tags" placeholder="個室, 掘りごたつ（カンマ区切り）" /></label>
+      <label>前回訪問日 <input type="date" data-k="last_visit" /></label>
+    </div>
+    <div class="chk-row">
+      <label class="chk"><input type="checkbox" data-k="private_room" /> 個室</label>
+      <label class="chk"><input type="checkbox" data-k="kids_ok" /> 子連れOK</label>
+      <label class="chk"><input type="checkbox" data-k="parking" /> 駐車場</label>
+      <label class="chk"><input type="checkbox" data-k="lunch" /> 昼</label>
+      <label class="chk"><input type="checkbox" data-k="dinner" checked /> 夜</label>
+      <label class="chk"><input type="checkbox" data-k="favorite" /> ★お気に入り</label>
+      <label class="chk"><input type="checkbox" data-k="visited" /> 訪問済み</label>
+    </div>
+    <textarea data-k="memo" placeholder="メモ・感想"></textarea>
+    <p class="meta">保存はこの端末（localStorage）に行われます。永続化（全端末・公開反映）は「MDエクスポート」で書き出して data/ に置き、ビルドしてください。URLを入れた店はローカルで食べログ補完できます。</p>
+    <div class="actions">
+      <button class="mini-btn" id="add-save">保存</button>
+      <button class="mini-btn" id="add-cancel">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+  const LS_KEY = 'oten-meta-v1';
+  const SHOPS_KEY = 'oten-shops-v1';
+  const state = { area: '', subarea: '', meal: '', budget: '', genre: '', fav: false, priv: false, kids: false, parking: false, visited: false, showHidden: false, q: '' };
+  const genreTokens = s => (s.genre || '').split(/[、,／/]/).map(t => t.trim()).filter(Boolean);
+  let shops = [];
+
+  // ローカル追加店（localStorage）
+  function loadLocalShops() { try { return JSON.parse(localStorage.getItem(SHOPS_KEY)) || []; } catch { return []; } }
+  function saveLocalShops(a) { localStorage.setItem(SHOPS_KEY, JSON.stringify(a)); }
+  function budgetRange(s) {
+    const nums = [...String(s || '').matchAll(/[\d,]{2,}/g)].map(x => Number(x[0].replace(/,/g, ''))).filter(n => n > 0);
+    return nums.length ? [Math.min(...nums), Math.max(...nums)] : [null, null];
+  }
+  // ローカル店をSHOP_DATAと同じ形に正規化
+  function normalizeLocal(o) {
+    const [bmin, bmax] = budgetRange(o.budget);
+    return {
+      slug: o.slug, name: o.name || '(無名)', area: o.area || '', subarea: o.subarea || '',
+      genre: o.genre || '', budget: o.budget || '', budget_min: bmin, budget_max: bmax,
+      private_room: !!o.private_room, kids_ok: !!o.kids_ok, parking: !!o.parking, parking_note: '',
+      morning: false, lunch: !!o.lunch, dinner: o.dinner !== false, takeout: false,
+      smoking: '', reservation: '', station_walk: o.station_walk || '', address: o.address || '',
+      scenes: [], rating: null, tabelog_score: null, favorite: !!o.favorite,
+      visited: !!o.visited || !!o.last_visit, last_visit: o.last_visit || '',
+      visits: o.last_visit ? [{ date: o.last_visit, note: o.memo || '' }] : [],
+      url: o.url || '', tel: '', tags: (o.tags || []),
+      hide: false, hide_reason: '', memo: o.memo || '', _local: true,
+    };
+  }
+
+  // ---- localStorage オーバーレイ ----
+  function loadMeta() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; } }
+  function saveMeta(m) { localStorage.setItem(LS_KEY, JSON.stringify(m)); }
+  let meta = loadMeta();
+
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const stars = n => n == null ? '' : '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n));
+  const today = () => new Date().toISOString().slice(0, 10);
+  // 住所があれば住所、なければ「店名 エリア駅」でGoogleマップ検索
+  const mapUrl = s => 'https://www.google.com/maps/search/?api=1&query=' +
+    encodeURIComponent(s.address || `${s.name} ${s.area}駅`);
+
+  // MDの値とlocalStorageを統合した実効値を返す
+  function effective(s) {
+    const lo = meta[s.slug] || {};
+    const favorite = ('favorite' in lo) ? lo.favorite : s.favorite;
+    const localVisits = (lo.visits || []).map(v => ({ ...v, local: true }));
+    const mdVisits = s.visits.map(v => ({ ...v, local: false }));
+    const allVisits = [...mdVisits, ...localVisits].sort((a, b) => b.date.localeCompare(a.date));
+    const last_visit = allVisits[0] ? allVisits[0].date : s.last_visit;
+    return { favorite, visits: allVisits, localVisits, last_visit, visited: s.visited || allVisits.length > 0 };
+  }
+
+  function matches(s, e) {
+    if (!state.showHidden && s.hide) return false;
+    if (state.area && s.area !== state.area) return false;
+    if (state.subarea && s.subarea !== state.subarea) return false;
+    if (state.meal && !s[state.meal]) return false;
+    if (state.budget) {
+      const [lo, hi] = state.budget.split('-');
+      const v = s.budget_min;
+      if (v == null) return false;
+      if (v < Number(lo)) return false;
+      if (hi && v > Number(hi)) return false;
+    }
+    if (state.genre && !genreTokens(s).includes(state.genre)) return false;
+    if (state.fav && !e.favorite) return false;
+    if (state.priv && !s.private_room) return false;
+    if (state.kids && !s.kids_ok) return false;
+    if (state.parking && !s.parking) return false;
+    if (state.visited && !e.visited) return false;
+    if (state.q) {
+      const hay = (s.name + s.genre + s.tags.join(' ') + s.memo).toLowerCase();
+      if (!hay.includes(state.q.toLowerCase())) return false;
+    }
+    return true;
+  }
+
+  function card(s, e) {
+    const badges = [
+      `<span class="badge ${s.private_room ? 'ok' : 'no'}">${s.private_room ? '個室あり' : '個室なし'}</span>`,
+      `<span class="badge ${s.kids_ok ? 'ok' : 'no'}">${s.kids_ok ? '子連れOK' : '子連れ△'}</span>`,
+      `<span class="badge ${s.parking ? 'ok' : 'no'}" title="${esc(s.parking_note)}">${s.parking ? '駐車場あり' : '駐車場なし'}</span>`,
+      s.smoking ? `<span class="badge">${esc(s.smoking)}</span>` : '',
+      s.reservation ? `<span class="badge">予約${esc(s.reservation)}</span>` : '',
+    ].join('');
+    const meals = [
+      s.morning ? '朝' : '', s.lunch ? '昼' : '', s.dinner ? '夜' : '', s.takeout ? 'テイクアウト' : ''
+    ].filter(Boolean);
+    const mealBadge = meals.length ? `<span class="badge ok">${meals.join('・')}</span>` : '';
+    const genreBadge = genreTokens(s).map(g => `<span class="badge genre">${esc(g)}</span>`).join('');
+    const tags = s.tags.map(t => `<span class="badge">${esc(t)}</span>`).join('');
+    const mapQ = encodeURIComponent(s.address || `${s.name} ${s.area}`);
+    const mapEmbed = `<iframe class="map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=${mapQ}&z=15&output=embed"></iframe>`;
+    const visitList = e.visits.length ? `<div class="visits">訪問履歴
+      <ul>${e.visits.map(v => `<li class="${v.local ? 'local' : ''}">${esc(v.date)}: ${esc(v.note)}${v.local ? '<span class="tag-unsaved">未保存</span>' : ''}</li>`).join('')}</ul>
+    </div>` : '';
+    const hasLocal = (meta[s.slug] && ((meta[s.slug].visits || []).length || ('favorite' in meta[s.slug])));
+    return `<div class="card ${s.hide ? 'hidden-shop' : ''}" data-slug="${esc(s.slug)}">
+      <div class="top">
+        <a class="name" href="${mapUrl(s)}" target="_blank" rel="noopener" title="Googleマップで開く">${esc(s.name)}</a>
+        <span class="right-top">
+          <button class="star-btn ${e.favorite ? 'on' : ''}" data-act="fav" title="お気に入り">★</button>
+          <span class="area">${esc(s.area)}${s.subarea ? ' · ' + esc(s.subarea) : ''}</span>
+        </span>
+      </div>
+      <div class="meta">${[esc(s.budget), esc(s.station_walk)].filter(Boolean).join(' ・ ')}</div>
+      ${e.last_visit ? `<div class="lastvisit">前回訪問: ${esc(e.last_visit)}</div>` : ''}
+      ${(s.rating != null || s.tabelog_score != null) ? `<div class="stars">${s.rating != null ? `<span title="自分の評価 ${s.rating}/5">${stars(s.rating)}</span>` : ''}${s.tabelog_score != null ? `<span class="tabelog" title="食べログ点数">　食べlog ${s.tabelog_score}</span>` : ''}</div>` : ''}
+      <div class="badges">${genreBadge}${mealBadge}${badges}${tags}</div>
+      ${mapEmbed}
+      ${s.hide && s.hide_reason ? `<div class="reason">⊘ 掲載不要: ${esc(s.hide_reason)}</div>` : ''}
+      ${s.memo ? `<div class="memo">${esc(s.memo)}</div>` : ''}
+      ${visitList}
+      <div class="links">
+        <a href="${mapUrl(s)}" target="_blank" rel="noopener">📍 Googleマップ</a>
+        ${s.url ? ` ・ <a href="${esc(s.url)}" target="_blank" rel="noopener">店舗リンク ↗</a>` : ''}
+      </div>
+      <div class="actions">
+        <button class="mini-btn" data-act="addvisit">＋ 訪問を記録</button>
+        ${s._local ? `<button class="mini-btn" data-act="exportmd">MDエクスポート</button>
+        <button class="mini-btn" data-act="dellocal">削除</button>` : ''}
+        ${hasLocal ? `<button class="mini-btn" data-act="copymd">MD用にコピー</button>
+        <button class="mini-btn" data-act="clearlocal">ローカル分クリア</button>` : ''}
+      </div>
+      <div class="vform">
+        <input type="date" data-f="date" value="${today()}" />
+        <textarea data-f="note" placeholder="感想（個室の雰囲気・料理・次回メモなど）"></textarea>
+        <div class="actions"><button class="mini-btn" data-act="savevisit">保存</button>
+        <button class="mini-btn" data-act="cancelvisit">キャンセル</button></div>
+      </div>
+    </div>`;
+  }
+
+  function render() {
+    const list = shops.map(s => ({ s, e: effective(s) })).filter(x => matches(x.s, x.e));
+    list.sort((a, b) => (a.s.hide === b.s.hide) ? 0 : (a.s.hide ? 1 : -1));
+    const grid = document.getElementById('grid');
+    const empty = document.getElementById('empty');
+    grid.innerHTML = list.map(x => card(x.s, x.e)).join('');
+    empty.style.display = list.length ? 'none' : 'block';
+    const hiddenCount = shops.filter(s => s.hide).length;
+    document.getElementById('count').textContent =
+      `表示 ${list.length} 件 / 全 ${shops.length} 件（非掲載 ${hiddenCount} 件）`;
+  }
+
+  // ---- カード内アクション（イベント委譲）----
+  document.getElementById('grid').addEventListener('click', e => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const cardEl = btn.closest('.card');
+    const slug = cardEl.dataset.slug;
+    const act = btn.dataset.act;
+    meta[slug] = meta[slug] || {};
+
+    if (act === 'fav') {
+      const cur = ('favorite' in meta[slug]) ? meta[slug].favorite : (shops.find(s => s.slug === slug)?.favorite || false);
+      meta[slug].favorite = !cur;
+      saveMeta(meta); render();
+    } else if (act === 'addvisit') {
+      cardEl.querySelector('.vform').classList.toggle('open');
+    } else if (act === 'cancelvisit') {
+      cardEl.querySelector('.vform').classList.remove('open');
+    } else if (act === 'savevisit') {
+      const date = cardEl.querySelector('[data-f="date"]').value || today();
+      const note = cardEl.querySelector('[data-f="note"]').value.trim();
+      if (!note) { alert('感想を入力してください'); return; }
+      meta[slug].visits = meta[slug].visits || [];
+      meta[slug].visits.push({ date, note });
+      saveMeta(meta); render();
+    } else if (act === 'clearlocal') {
+      if (confirm('この店のローカル変更（★・未保存の訪問記録）を削除します。よろしいですか？')) {
+        delete meta[slug]; saveMeta(meta); render();
+      }
+    } else if (act === 'copymd') {
+      copyMdSnippet(slug);
+    } else if (act === 'exportmd') {
+      exportLocalMd(slug);
+    } else if (act === 'dellocal') {
+      if (confirm('このローカル追加店を削除します。よろしいですか？')) {
+        saveLocalShops(loadLocalShops().filter(x => x.slug !== slug));
+        shops = shops.filter(s => s.slug !== slug);
+        buildAreaButtons(); buildGenreOptions(); render();
+      }
+    }
+  });
+
+  // localStorageの変更を MD 貼り付け用テキストに変換してコピー
+  function copyMdSnippet(slug) {
+    const lo = meta[slug] || {};
+    const lines = [];
+    if ('favorite' in lo) lines.push(`# frontmatter を次のように:  favorite: ${lo.favorite}`);
+    if ((lo.visits || []).length) {
+      lines.push('# 本文の「## 訪問記録」に以下を追記:');
+      lo.visits.slice().sort((a, b) => b.date.localeCompare(a.date))
+        .forEach(v => lines.push(`- ${v.date}: ${v.note}`));
+    }
+    const text = lines.join('\n');
+    navigator.clipboard.writeText(text).then(
+      () => alert('MD貼り付け用テキストをコピーしました。\n対象MDに貼って node build.mjs 後、「ローカル分クリア」で重複を消してください。\n\n' + text),
+      () => prompt('コピーできませんでした。手動でコピーしてください:', text)
+    );
+  }
+
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `oten-meta-${today()}.json`;
+    a.click();
+  });
+
+  // ---- エリアボタンを件数つきで動的生成 ----
+  function buildAreaButtons() {
+    const counts = {};
+    for (const s of shops) counts[s.area] = (counts[s.area] || 0) + 1;
+    const areas = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'ja'));
+    const seg = document.getElementById('area-seg');
+    seg.innerHTML = `<button data-area="" class="active">全部 ${shops.length}</button>` +
+      areas.map(a => `<button data-area="${esc(a)}">${esc(a)} ${counts[a]}</button>`).join('');
+  }
+
+  // 選択エリアのサブエリアchipを生成（無ければ隠す）
+  function buildSubareaButtons() {
+    const seg = document.getElementById('subarea-seg');
+    const counts = {};
+    for (const s of shops) if (s.area === state.area && s.subarea) counts[s.subarea] = (counts[s.subarea] || 0) + 1;
+    const subs = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'ja'));
+    if (!state.area || subs.length === 0) { seg.style.display = 'none'; seg.innerHTML = ''; return; }
+    seg.style.display = '';
+    const total = subs.reduce((n, k) => n + counts[k], 0);
+    seg.innerHTML = `<button data-subarea="" class="${state.subarea ? '' : 'active'}">全${esc(state.area)} ${total}</button>` +
+      subs.map(s => `<button data-subarea="${esc(s)}" class="${state.subarea === s ? 'active' : ''}">${esc(s)} ${counts[s]}</button>`).join('');
+  }
+
+  // ---- フィルタ（セグメント共通）----
+  function segHandler(id, key, after) {
+    document.getElementById(id).addEventListener('click', e => {
+      if (e.target.tagName !== 'BUTTON') return;
+      state[key] = e.target.dataset[key];
+      [...e.currentTarget.children].forEach(b => b.classList.toggle('active', b === e.target));
+      if (after) after();
+      render();
+    });
+  }
+  segHandler('area-seg', 'area', () => { state.subarea = ''; buildSubareaButtons(); });
+  segHandler('subarea-seg', 'subarea');
+  segHandler('meal-seg', 'meal');
+
+  // ジャンルselectを件数つきで生成
+  function buildGenreOptions() {
+    const counts = {};
+    for (const s of shops) for (const g of genreTokens(s)) counts[g] = (counts[g] || 0) + 1;
+    const genres = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'ja'));
+    const sel = document.getElementById('genre-sel');
+    sel.innerHTML = `<option value="">ジャンル: 全部</option>` +
+      genres.map(g => `<option value="${esc(g)}">${esc(g)} (${counts[g]})</option>`).join('');
+  }
+
+  const bind = (id, key) => document.getElementById(id).addEventListener('change', e => { state[key] = e.target.checked; render(); });
+  bind('f-fav', 'fav'); bind('f-private', 'priv'); bind('f-kids', 'kids');
+  bind('f-parking', 'parking'); bind('f-visited', 'visited'); bind('f-showhidden', 'showHidden');
+  const bindSel = (id, key) => document.getElementById(id).addEventListener('change', e => { state[key] = e.target.value; render(); });
+  bindSel('budget-sel', 'budget'); bindSel('genre-sel', 'genre');
+  document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; render(); });
+
+  // ---- 店追加フォーム ----
+  const addModal = document.getElementById('add-modal');
+  document.getElementById('add-btn').addEventListener('click', () => {
+    addModal.querySelectorAll('[data-k]').forEach(el => { if (el.type === 'checkbox') el.checked = (el.dataset.k === 'dinner'); else el.value = ''; });
+    addModal.style.display = 'flex';
+  });
+  document.getElementById('add-cancel').addEventListener('click', () => { addModal.style.display = 'none'; });
+  document.getElementById('add-save').addEventListener('click', () => {
+    const get = k => addModal.querySelector(`[data-k="${k}"]`);
+    const name = get('name').value.trim();
+    if (!name) { alert('店名を入力してください'); return; }
+    const o = { slug: 'local-' + Date.now().toString(36) };
+    ['name', 'area', 'subarea', 'genre', 'budget', 'station_walk', 'url', 'address', 'last_visit', 'memo']
+      .forEach(k => o[k] = get(k).value.trim());
+    ['private_room', 'kids_ok', 'parking', 'lunch', 'dinner', 'favorite', 'visited']
+      .forEach(k => o[k] = get(k).checked);
+    o.tags = get('tags').value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
+    const arr = loadLocalShops(); arr.push(o); saveLocalShops(arr);
+    shops.push(normalizeLocal(o));
+    addModal.style.display = 'none';
+    buildAreaButtons(); buildGenreOptions(); render();
+    alert('追加しました（この端末に保存）。公開へ反映するにはカードの「MDエクスポート」で書き出してください。');
+  });
+
+  // ローカル店をMDとして書き出す
+  function exportLocalMd(slug) {
+    const o = loadLocalShops().find(x => x.slug === slug); if (!o) return;
+    const q = v => /[:#\[\]"']/.test(v || '') ? JSON.stringify(v) : (v || '');
+    const fm = [
+      `name: ${q(o.name)}`, `area: ${o.area || ''}`, `subarea: ${o.subarea || ''}`,
+      `genre: ${o.genre || ''}`, `budget: ${o.budget || ''}`,
+      `private_room: ${!!o.private_room}`, `kids_ok: ${!!o.kids_ok}`, `parking: ${!!o.parking}`,
+      `parking_note: `, `morning: false`, `lunch: ${!!o.lunch}`, `dinner: ${o.dinner !== false}`,
+      `takeout: false`, `smoking: `, `reservation: `, `station_walk: ${o.station_walk || ''}`,
+      `address: ${o.address || ''}`, `scenes: []`, `rating: `, `tabelog_score: `,
+      `favorite: ${!!o.favorite}`, `visited: ${!!o.visited || !!o.last_visit}`, `last_visit: ${o.last_visit || ''}`,
+      `url: ${o.url || ''}`, `tel: `, `tags: [${(o.tags || []).join(', ')}]`, `hide: false`, `hide_reason: `,
+    ].join('\n');
+    let body = o.memo || '';
+    if (o.last_visit) body += `${body ? '\n\n' : ''}## 訪問記録\n- ${o.last_visit}: ${o.memo || ''}`;
+    const md = `---\n${fm}\n---\n${body}\n`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }));
+    const folder = ({ '名古屋': 'nagoya', '桑名': 'kuwana', '津': 'tsu', '鈴鹿': 'suzuka', '亀山': 'kameyama' }[o.area]) || (o.area || 'misc');
+    a.download = `${o.name}.md`;
+    a.click();
+    alert(`「${o.name}.md」を書き出しました。\ndata/${folder}/${o.subarea ? o.subarea + '/' : ''} に置き、URLがあれば食べログ補完→ node build.mjs。`);
+  }
+
+  // ---- 初期化 ----
+  function init(data) {
+    shops = (data || []).concat(loadLocalShops().map(normalizeLocal));
+    buildAreaButtons(); buildGenreOptions();
+    if (!shops.length) document.getElementById('count').textContent = 'データがありません。node build.mjs を実行してください。';
+    render();
+  }
+
+  // ---- 簡易パスワードゲート ----
+  // ※ 簡易な閲覧制限です（data.js は平文）。漏洩しても問題ない情報向け。
+  //    合言葉を変えるには下の APP_PASSWORD を書き換えてください。
+  const APP_PASSWORD = 'oten';
+
+  function showGate() {
+    const gate = document.getElementById('gate');
+    gate.style.display = 'flex';
+    const pw = document.getElementById('gate-pw'), err = document.getElementById('gate-err');
+    const submit = () => {
+      if (pw.value === APP_PASSWORD) {
+        sessionStorage.setItem('oten-unlocked', '1');
+        gate.style.display = 'none';
+        init(window.SHOP_DATA);
+      } else { err.style.display = 'block'; pw.select(); }
+    };
+    document.getElementById('gate-ok').addEventListener('click', submit);
+    pw.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    pw.focus();
+  }
+
+  // 起動: データが無ければメッセージ、あればゲート（セッション内は解錠済みskip）
+  if (!window.SHOP_DATA) {
+    document.getElementById('count').textContent = 'データがありません。node build.mjs を実行してください。';
+  } else if (sessionStorage.getItem('oten-unlocked') === '1') {
+    init(window.SHOP_DATA);
+  } else {
+    showGate();
+  }
+</script>
+</body>
+</html>
