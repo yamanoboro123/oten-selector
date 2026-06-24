@@ -1,5 +1,5 @@
 // 自動生成ファイル。手で編集しないこと（node build.mjs で再生成される）
-// generated: 2026-06-24T09:28:30.280Z
+// generated: 2026-06-24T09:29:46.776Z
 window.SHOP_DATA = [
   {
     "slug": "mie-24020452",
@@ -226,7 +226,7 @@ window.SHOP_DATA = [
   {
     "slug": "aichi-23076151",
     "name": "炭棟梁",
-    "area": "蒲",
+    "area": "蒲郡",
     "subarea": "aichi",
     "genre": "ハンバーグ",
     "budget": "",
