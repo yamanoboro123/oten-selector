@@ -170,6 +170,7 @@
 <script>
   const LS_KEY = 'oten-meta-v1';
   const SHOPS_KEY = 'oten-shops-v1';
+  const EDITS_KEY = 'oten-edits-v1';
   const state = { area: '', subarea: '', meal: '', budget: '', genre: '', fav: false, priv: false, kids: false, parking: false, visited: false, showHidden: false, q: '' };
   const genreTokens = s => (s.genre || '').split(/[、,／/]/).map(t => t.trim()).filter(Boolean);
   let shops = [];
@@ -259,6 +260,7 @@
     ].filter(Boolean);
     const mealBadge = meals.length ? `<span class="badge ok">${meals.join('・')}</span>` : '';
     const genreBadge = genreTokens(s).map(g => `<span class="badge genre">${esc(g)}</span>`).join('');
+    const editedBadge = (s._edited || s._local) ? `<span class="badge no" title="この端末での${s._local ? '追加' : '編集'}（未公開）">${s._local ? '追加' : '編集済'}</span>` : '';
     const tags = s.tags.map(t => `<span class="badge">${esc(t)}</span>`).join('');
     const mapQ = encodeURIComponent(s.address || `${s.name} ${s.area}`);
     const mapEmbed = `<iframe class="map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=${mapQ}&z=15&output=embed"></iframe>`;
@@ -277,7 +279,7 @@
       <div class="meta">${[esc(s.budget), esc(s.station_walk)].filter(Boolean).join(' ・ ')}</div>
       ${e.last_visit ? `<div class="lastvisit">前回訪問: ${esc(e.last_visit)}</div>` : ''}
       ${(s.rating != null || s.tabelog_score != null) ? `<div class="stars">${s.rating != null ? `<span title="自分の評価 ${s.rating}/5">${stars(s.rating)}</span>` : ''}${s.tabelog_score != null ? `<span class="tabelog" title="食べログ点数">　食べlog ${s.tabelog_score}</span>` : ''}</div>` : ''}
-      <div class="badges">${genreBadge}${mealBadge}${badges}${tags}</div>
+      <div class="badges">${editedBadge}${genreBadge}${mealBadge}${badges}${tags}</div>
       ${mapEmbed}
       ${s.hide && s.hide_reason ? `<div class="reason">⊘ 掲載不要: ${esc(s.hide_reason)}</div>` : ''}
       ${s.memo ? `<div class="memo">${esc(s.memo)}</div>` : ''}
@@ -288,10 +290,11 @@
       </div>
       <div class="actions">
         <button class="mini-btn" data-act="addvisit">＋ 訪問を記録</button>
-        ${s._local ? `<button class="mini-btn" data-act="exportmd">MDエクスポート</button>
-        <button class="mini-btn" data-act="dellocal">削除</button>` : ''}
-        ${hasLocal ? `<button class="mini-btn" data-act="copymd">MD用にコピー</button>
-        <button class="mini-btn" data-act="clearlocal">ローカル分クリア</button>` : ''}
+        <button class="mini-btn" data-act="edit">✎ 編集</button>
+        <button class="mini-btn" data-act="exportmd">MDエクスポート</button>
+        ${s._local ? `<button class="mini-btn" data-act="dellocal">削除</button>` : ''}
+        ${(meta[s.slug] && (meta[s.slug].visits || []).length) ? `<button class="mini-btn" data-act="copymd">訪問をMD用にコピー</button>` : ''}
+        ${(s._edited || (meta[s.slug] && ((meta[s.slug].visits || []).length || ('favorite' in meta[s.slug])))) ? `<button class="mini-btn" data-act="clearlocal">編集/ローカル分を戻す</button>` : ''}
       </div>
       <div class="vform">
         <input type="date" data-f="date" value="${today()}" />
@@ -339,16 +342,21 @@
       meta[slug].visits.push({ date, note });
       saveMeta(meta); render();
     } else if (act === 'clearlocal') {
-      if (confirm('この店のローカル変更（★・未保存の訪問記録）を削除します。よろしいですか？')) {
-        delete meta[slug]; saveMeta(meta); render();
+      if (confirm('この店のこの端末での変更（編集・★・未保存の訪問記録）を取り消して元に戻します。よろしいですか？')) {
+        delete meta[slug]; saveMeta(meta);
+        const edits = loadEdits(); delete edits[slug]; saveEdits(edits);
+        init(window.SHOP_DATA); // 元データから再構築して編集を解除
       }
+    } else if (act === 'edit') {
+      openShopForm('edit', slug);
     } else if (act === 'copymd') {
       copyMdSnippet(slug);
     } else if (act === 'exportmd') {
-      exportLocalMd(slug);
+      exportMd(slug);
     } else if (act === 'dellocal') {
       if (confirm('このローカル追加店を削除します。よろしいですか？')) {
         saveLocalShops(loadLocalShops().filter(x => x.slug !== slug));
+        const edits = loadEdits(); delete edits[slug]; saveEdits(edits);
         shops = shops.filter(s => s.slug !== slug);
         buildAreaButtons(); buildGenreOptions(); render();
       }
@@ -434,58 +442,100 @@
   bindSel('budget-sel', 'budget'); bindSel('genre-sel', 'genre');
   document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; render(); });
 
-  // ---- 店追加フォーム ----
+  // ---- 店追加・編集フォーム ----
   const addModal = document.getElementById('add-modal');
-  document.getElementById('add-btn').addEventListener('click', () => {
-    addModal.querySelectorAll('[data-k]').forEach(el => { if (el.type === 'checkbox') el.checked = (el.dataset.k === 'dinner'); else el.value = ''; });
+  const TEXT_KEYS = ['name', 'area', 'subarea', 'genre', 'budget', 'station_walk', 'url', 'address', 'last_visit', 'memo'];
+  const BOOL_KEYS = ['private_room', 'kids_ok', 'parking', 'lunch', 'dinner', 'favorite', 'visited'];
+  let formMode = 'add', editingSlug = null;
+
+  function openShopForm(mode, slug) {
+    formMode = mode; editingSlug = slug || null;
+    const get = k => addModal.querySelector(`[data-k="${k}"]`);
+    const src = mode === 'edit' ? shops.find(s => s.slug === slug) : null;
+    if (src) src.favorite = effective(src).favorite; // ★の実効値を反映
+    TEXT_KEYS.forEach(k => get(k).value = src ? (src[k] || '') : '');
+    BOOL_KEYS.forEach(k => get(k).checked = src ? !!src[k] : (k === 'dinner'));
+    get('tags').value = src ? (src.tags || []).join(', ') : '';
+    document.getElementById('add-title').textContent = mode === 'edit' ? `店を編集: ${src ? src.name : ''}` : '店を追加';
     addModal.style.display = 'flex';
-  });
+  }
+  document.getElementById('add-btn').addEventListener('click', () => openShopForm('add'));
   document.getElementById('add-cancel').addEventListener('click', () => { addModal.style.display = 'none'; });
   document.getElementById('add-save').addEventListener('click', () => {
     const get = k => addModal.querySelector(`[data-k="${k}"]`);
     const name = get('name').value.trim();
     if (!name) { alert('店名を入力してください'); return; }
-    const o = { slug: 'local-' + Date.now().toString(36) };
-    ['name', 'area', 'subarea', 'genre', 'budget', 'station_walk', 'url', 'address', 'last_visit', 'memo']
-      .forEach(k => o[k] = get(k).value.trim());
-    ['private_room', 'kids_ok', 'parking', 'lunch', 'dinner', 'favorite', 'visited']
-      .forEach(k => o[k] = get(k).checked);
-    o.tags = get('tags').value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
-    const arr = loadLocalShops(); arr.push(o); saveLocalShops(arr);
-    shops.push(normalizeLocal(o));
-    addModal.style.display = 'none';
-    buildAreaButtons(); buildGenreOptions(); render();
-    alert('追加しました（この端末に保存）。公開へ反映するにはカードの「MDエクスポート」で書き出してください。');
+    const vals = {};
+    TEXT_KEYS.forEach(k => vals[k] = get(k).value.trim());
+    BOOL_KEYS.forEach(k => vals[k] = get(k).checked);
+    vals.tags = get('tags').value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
+
+    if (formMode === 'edit') {
+      const ov = { ...vals }; delete ov.favorite;       // ★はmetaで管理
+      const edits = loadEdits(); edits[editingSlug] = ov; saveEdits(edits);
+      meta[editingSlug] = meta[editingSlug] || {}; meta[editingSlug].favorite = vals.favorite; saveMeta(meta);
+      const s = shops.find(x => x.slug === editingSlug); if (s) applyEdit(s, ov);
+      addModal.style.display = 'none';
+      buildAreaButtons(); buildGenreOptions(); render();
+      alert('編集を保存しました（この端末）。公開へ反映するにはカードの「MDエクスポート」で書き出し、data/ の同名ファイルを置き換えてください。');
+    } else {
+      const o = { slug: 'local-' + Date.now().toString(36), ...vals };
+      const arr = loadLocalShops(); arr.push(o); saveLocalShops(arr);
+      shops.push(normalizeLocal(o));
+      addModal.style.display = 'none';
+      buildAreaButtons(); buildGenreOptions(); render();
+      alert('追加しました（この端末に保存）。公開へ反映するにはカードの「MDエクスポート」で書き出してください。');
+    }
   });
 
-  // ローカル店をMDとして書き出す
-  function exportLocalMd(slug) {
-    const o = loadLocalShops().find(x => x.slug === slug); if (!o) return;
+  // 店（編集反映済みの実体）をMDとして書き出す
+  function exportMd(slug) {
+    const o = shops.find(x => x.slug === slug); if (!o) return;
+    const e = effective(o);
     const q = v => /[:#\[\]"']/.test(v || '') ? JSON.stringify(v) : (v || '');
     const fm = [
       `name: ${q(o.name)}`, `area: ${o.area || ''}`, `subarea: ${o.subarea || ''}`,
       `genre: ${o.genre || ''}`, `budget: ${o.budget || ''}`,
       `private_room: ${!!o.private_room}`, `kids_ok: ${!!o.kids_ok}`, `parking: ${!!o.parking}`,
-      `parking_note: `, `morning: false`, `lunch: ${!!o.lunch}`, `dinner: ${o.dinner !== false}`,
-      `takeout: false`, `smoking: `, `reservation: `, `station_walk: ${o.station_walk || ''}`,
-      `address: ${o.address || ''}`, `scenes: []`, `rating: `, `tabelog_score: `,
-      `favorite: ${!!o.favorite}`, `visited: ${!!o.visited || !!o.last_visit}`, `last_visit: ${o.last_visit || ''}`,
-      `url: ${o.url || ''}`, `tel: `, `tags: [${(o.tags || []).join(', ')}]`, `hide: false`, `hide_reason: `,
+      `parking_note: ${o.parking_note || ''}`, `morning: ${!!o.morning}`, `lunch: ${!!o.lunch}`, `dinner: ${o.dinner !== false}`,
+      `takeout: ${!!o.takeout}`, `smoking: ${o.smoking || ''}`, `reservation: ${o.reservation || ''}`, `station_walk: ${o.station_walk || ''}`,
+      `address: ${o.address || ''}`, `scenes: [${(o.scenes || []).join(', ')}]`, `rating: ${o.rating ?? ''}`, `tabelog_score: ${o.tabelog_score ?? ''}`,
+      `favorite: ${!!e.favorite}`, `visited: ${!!o.visited || !!e.last_visit}`, `last_visit: ${e.last_visit || ''}`,
+      `url: ${o.url || ''}`, `tel: ${o.tel || ''}`, `tags: [${(o.tags || []).join(', ')}]`, `hide: ${!!o.hide}`, `hide_reason: ${o.hide_reason || ''}`,
     ].join('\n');
     let body = o.memo || '';
-    if (o.last_visit) body += `${body ? '\n\n' : ''}## 訪問記録\n- ${o.last_visit}: ${o.memo || ''}`;
+    const localVisits = e.visits.filter(v => v.local);
+    if (localVisits.length) body += `${body ? '\n\n' : ''}## 訪問記録\n` + localVisits.map(v => `- ${v.date}: ${v.note}`).join('\n');
     const md = `---\n${fm}\n---\n${body}\n`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }));
-    const folder = ({ '名古屋': 'nagoya', '桑名': 'kuwana', '津': 'tsu', '鈴鹿': 'suzuka', '亀山': 'kameyama' }[o.area]) || (o.area || 'misc');
-    a.download = `${o.name}.md`;
+    const fname = o._local ? o.name : o.slug;   // 既存店はslug=元ファイル名で上書き用
+    a.download = `${fname}.md`;
     a.click();
-    alert(`「${o.name}.md」を書き出しました。\ndata/${folder}/${o.subarea ? o.subarea + '/' : ''} に置き、URLがあれば食べログ補完→ node build.mjs。`);
+    const folder = ({ '名古屋': 'nagoya', '桑名': 'kuwana', '津': 'tsu', '鈴鹿': 'suzuka', '亀山': 'kameyama' }[o.area]) || (o.area || 'misc');
+    alert(o._local
+      ? `「${o.name}.md」を書き出しました。data/${folder}/${o.subarea ? o.subarea + '/' : ''} に置き、node build.mjs。`
+      : `「${fname}.md」を書き出しました。data/ 内の同名ファイルを置き換えて node build.mjs → node publish.mjs。`);
+  }
+
+  // ---- 編集オーバーライド（localStorage） ----
+  function loadEdits() { try { return JSON.parse(localStorage.getItem(EDITS_KEY)) || {}; } catch { return {}; } }
+  function saveEdits(e) { localStorage.setItem(EDITS_KEY, JSON.stringify(e)); }
+  function applyEdit(shop, ov) {
+    Object.assign(shop, ov);
+    const [bmin, bmax] = budgetRange(shop.budget);
+    shop.budget_min = bmin; shop.budget_max = bmax;
+    if (!Array.isArray(shop.tags)) shop.tags = String(shop.tags || '').split(/[,、]/).map(s => s.trim()).filter(Boolean);
+    shop.visited = !!shop.visited || !!shop.last_visit;
+    shop._edited = true;
   }
 
   // ---- 初期化 ----
   function init(data) {
-    shops = (data || []).concat(loadLocalShops().map(normalizeLocal));
+    // 元データはコピーして使う（編集の取り消しで原本に戻せるように）
+    shops = (data || []).map(s => ({ ...s })).concat(loadLocalShops().map(normalizeLocal));
+    const edits = loadEdits();
+    for (const s of shops) if (edits[s.slug]) applyEdit(s, edits[s.slug]);
     buildAreaButtons(); buildGenreOptions();
     if (!shops.length) document.getElementById('count').textContent = 'データがありません。node build.mjs を実行してください。';
     render();
