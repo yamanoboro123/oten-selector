@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>お店セレクター</title>
 <style>
   :root {
@@ -21,6 +24,7 @@
     background: var(--card); position: sticky; top: 0; z-index: 10;
   }
   h1 { margin: 0; font-size: 20px; letter-spacing: .04em; }
+  .ver { font-size: 10px; font-weight: 400; color: var(--sub); letter-spacing: 0; }
   .count { color: var(--sub); font-size: 13px; margin-top: 2px; }
   .filters { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 14px; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
@@ -95,7 +99,7 @@
   .sheet-bk.open { display: block; }
   #mobilebar { display: none; }
 
-  @media (max-width: 760px) {
+  @media (max-width: 820px) {
     header { padding: 12px 16px 10px; }
     h1 { font-size: 17px; }
     main { padding: 14px 12px 80px; }
@@ -136,7 +140,7 @@
 </head>
 <body>
 <header>
-  <h1>お店セレクター</h1>
+  <h1>お店セレクター <span class="ver">build 2026-06-25 12:05</span></h1>
   <div class="count" id="count">読み込み中…</div>
   <div class="filters" id="filters">
     <div class="sheet-head"><span>絞り込み</span><button class="mini-btn" id="sheet-close">閉じる</button></div>
