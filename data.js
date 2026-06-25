@@ -1,5 +1,5 @@
 // 自動生成ファイル。手で編集しないこと（node build.mjs で再生成される）
-// generated: 2026-06-24T22:20:32.215Z
+// generated: 2026-06-25T10:59:14.627Z
 window.SHOP_DATA = [
   {
     "slug": "Patisserie Cafe こんま亭",

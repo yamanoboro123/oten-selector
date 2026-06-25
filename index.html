@@ -77,13 +77,69 @@
   .vform textarea { width: 100%; min-height: 52px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; }
   .empty { text-align: center; color: var(--sub); padding: 60px 0; }
   .toggle-row { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+  /* 予算レンジスライダー */
+  .budget-range { display: flex; flex-direction: column; gap: 2px; min-width: 190px; }
+  .budget-label { font-size: 12px; color: var(--sub); }
+  .budget-label span { color: var(--accent); font-weight: 700; }
+  .dual { position: relative; height: 22px; }
+  .dual input[type="range"] { position: absolute; left: 0; top: 0; width: 100%; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; pointer-events: none; }
+  .dual input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: var(--line); border-radius: 4px; }
+  .dual input[type="range"]::-moz-range-track { height: 4px; background: var(--line); border-radius: 4px; }
+  .dual input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); cursor: pointer; }
+  .dual input[type="range"]::-moz-range-thumb { pointer-events: auto; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; cursor: pointer; }
+
+  /* シート見出し / 背景 / 下部バー（モバイルのみ表示） */
+  .sheet-head { display: none; }
+  .sheet-bk { display: none; position: fixed; inset: 0; background: rgba(20,18,14,.45); z-index: 115; }
+  .sheet-bk.open { display: block; }
+  #mobilebar { display: none; }
+
+  @media (max-width: 760px) {
+    header { padding: 12px 16px 10px; }
+    h1 { font-size: 17px; }
+    main { padding: 14px 12px 80px; }
+    .grid { grid-template-columns: 1fr; }
+    /* フィルタを下部スライドアップシート化 */
+    .filters {
+      position: fixed; left: 0; right: 0; bottom: 0; margin: 0;
+      max-height: 78vh; overflow-y: auto; z-index: 120;
+      background: var(--card); border-top: 1px solid var(--line);
+      border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.18);
+      padding: 0 16px 84px; gap: 12px;
+      transform: translateY(110%); transition: transform .25s ease; visibility: hidden;
+    }
+    .filters.open { transform: none; visibility: visible; }
+    .sheet-head {
+      display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; background: var(--card); padding: 14px 0 10px;
+      font-weight: 700; border-bottom: 1px solid var(--line); margin-bottom: 4px; z-index: 1;
+    }
+    .toggle-row { margin-left: 0; }
+    .budget-range { min-width: 0; }
+    #mobilebar {
+      display: flex; position: fixed; left: 0; right: 0; bottom: 0; height: 62px;
+      background: var(--card); border-top: 1px solid var(--line); z-index: 130;
+    }
+    #mobilebar button {
+      flex: 1; position: relative; border: 0; background: transparent; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+      color: var(--sub); font-size: 11px;
+    }
+    #mobilebar button.active { color: var(--accent); }
+    #mobilebar .bi { font-size: 20px; line-height: 1; }
+    .fcount { position: absolute; top: 6px; right: 22px; min-width: 16px; height: 16px; padding: 0 4px;
+      background: var(--accent); color: #fff; border-radius: 999px; font-size: 10px; line-height: 16px; display: none; }
+    .fcount.on { display: inline-block; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>お店セレクター</h1>
   <div class="count" id="count">読み込み中…</div>
-  <div class="filters">
+  <div class="filters" id="filters">
+    <div class="sheet-head"><span>絞り込み</span><button class="mini-btn" id="sheet-close">閉じる</button></div>
     <div class="seg" id="area-seg"><!-- 動的生成 --></div>
     <div class="seg" id="subarea-seg" style="display:none"><!-- 名古屋など選択時に動的生成 --></div>
     <div class="seg" id="meal-seg">
@@ -93,14 +149,13 @@
       <button data-meal="dinner">夜</button>
       <button data-meal="takeout">テイクアウト</button>
     </div>
-    <select id="budget-sel" class="sel" title="予算で絞る">
-      <option value="">予算: 全部</option>
-      <option value="0-1999">〜¥2,000</option>
-      <option value="2000-3999">¥2,000〜4,000</option>
-      <option value="4000-5999">¥4,000〜6,000</option>
-      <option value="6000-9999">¥6,000〜1万</option>
-      <option value="10000-">¥1万〜</option>
-    </select>
+    <div class="budget-range">
+      <div class="budget-label">予算 <span id="budget-val">指定なし</span></div>
+      <div class="dual">
+        <input type="range" id="budget-min" min="0" max="40000" step="1000" value="0" />
+        <input type="range" id="budget-max" min="0" max="40000" step="1000" value="40000" />
+      </div>
+    </div>
     <select id="genre-sel" class="sel" title="ジャンルで絞る"><option value="">ジャンル: 全部</option></select>
     <label class="chk"><input type="checkbox" id="f-fav" /> ★お気に入り</label>
     <label class="chk"><input type="checkbox" id="f-private" /> 個室あり</label>
@@ -120,6 +175,15 @@
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none">条件に合うお店がありません。</div>
 </main>
+
+<!-- モバイル用 下部ナビ＋背景 -->
+<div id="sheet-bk" class="sheet-bk"></div>
+<nav id="mobilebar">
+  <button data-bar="search"><span class="bi">🔍</span><span class="bl">検索</span></button>
+  <button data-bar="filter"><span class="bi">🎛</span><span class="bl">絞り込み</span><span id="fcount" class="fcount"></span></button>
+  <button data-bar="add"><span class="bi">＋</span><span class="bl">追加</span></button>
+  <button data-bar="top"><span class="bi">↑</span><span class="bl">上へ</span></button>
+</nav>
 
 <!-- パスワードゲート（暗号公開時のみ表示） -->
 <div id="gate" class="overlay" style="display:none">
@@ -171,7 +235,8 @@
   const LS_KEY = 'oten-meta-v1';
   const SHOPS_KEY = 'oten-shops-v1';
   const EDITS_KEY = 'oten-edits-v1';
-  const state = { area: '', subarea: '', meal: '', budget: '', genre: '', fav: false, priv: false, kids: false, parking: false, visited: false, showHidden: false, q: '' };
+  const BUDGET_MAX = 40000;
+  const state = { area: '', subarea: '', meal: '', budgetMin: 0, budgetMax: BUDGET_MAX, genre: '', fav: false, priv: false, kids: false, parking: false, visited: false, showHidden: false, q: '' };
   const genreTokens = s => (s.genre || '').split(/[、,／/]/).map(t => t.trim()).filter(Boolean);
   let shops = [];
 
@@ -227,12 +292,10 @@
     if (state.area && s.area !== state.area) return false;
     if (state.subarea && s.subarea !== state.subarea) return false;
     if (state.meal && !s[state.meal]) return false;
-    if (state.budget) {
-      const [lo, hi] = state.budget.split('-');
-      const v = s.budget_min;
-      if (v == null) return false;
-      if (v < Number(lo)) return false;
-      if (hi && v > Number(hi)) return false;
+    if (state.budgetMin > 0 || state.budgetMax < BUDGET_MAX) {
+      if (s.budget_min == null || s.budget_max == null) return false;
+      const selMax = state.budgetMax >= BUDGET_MAX ? Infinity : state.budgetMax;
+      if (!(s.budget_min <= selMax && s.budget_max >= state.budgetMin)) return false;
     }
     if (state.genre && !genreTokens(s).includes(state.genre)) return false;
     if (state.fav && !e.favorite) return false;
@@ -315,6 +378,7 @@
     const hiddenCount = shops.filter(s => s.hide).length;
     document.getElementById('count').textContent =
       `表示 ${list.length} 件 / 全 ${shops.length} 件（非掲載 ${hiddenCount} 件）`;
+    if (typeof updateFilterCount === 'function') updateFilterCount();
   }
 
   // ---- カード内アクション（イベント委譲）----
@@ -438,9 +502,51 @@
   const bind = (id, key) => document.getElementById(id).addEventListener('change', e => { state[key] = e.target.checked; render(); });
   bind('f-fav', 'fav'); bind('f-private', 'priv'); bind('f-kids', 'kids');
   bind('f-parking', 'parking'); bind('f-visited', 'visited'); bind('f-showhidden', 'showHidden');
-  const bindSel = (id, key) => document.getElementById(id).addEventListener('change', e => { state[key] = e.target.value; render(); });
-  bindSel('budget-sel', 'budget'); bindSel('genre-sel', 'genre');
+  document.getElementById('genre-sel').addEventListener('change', e => { state.genre = e.target.value; render(); });
   document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; render(); });
+
+  // ---- 予算レンジスライダー ----
+  const bMin = document.getElementById('budget-min'), bMax = document.getElementById('budget-max');
+  const yen = n => '¥' + Number(n).toLocaleString('en-US');
+  function updateBudget() {
+    let lo = Number(bMin.value), hi = Number(bMax.value);
+    if (lo > hi) { if (this === bMin) hi = lo, bMax.value = hi; else lo = hi, bMin.value = lo; }
+    state.budgetMin = lo; state.budgetMax = hi;
+    const val = document.getElementById('budget-val');
+    if (lo === 0 && hi >= BUDGET_MAX) val.textContent = '指定なし';
+    else val.textContent = `${yen(lo)} 〜 ${hi >= BUDGET_MAX ? '上限なし' : yen(hi)}`;
+    render();
+  }
+  bMin.addEventListener('input', updateBudget);
+  bMax.addEventListener('input', updateBudget);
+
+  // ---- モバイル下部バー / フィルタシート ----
+  const filtersEl = document.getElementById('filters'), bk = document.getElementById('sheet-bk');
+  function openSheet(open) {
+    filtersEl.classList.toggle('open', open); bk.classList.toggle('open', open);
+    document.querySelector('#mobilebar [data-bar="filter"]').classList.toggle('active', open);
+  }
+  document.getElementById('mobilebar').addEventListener('click', e => {
+    const b = e.target.closest('[data-bar]'); if (!b) return;
+    const act = b.dataset.bar;
+    if (act === 'filter') openSheet(!filtersEl.classList.contains('open'));
+    else if (act === 'search') { openSheet(true); document.getElementById('q').focus(); }
+    else if (act === 'add') { openSheet(false); openShopForm('add'); }
+    else if (act === 'top') window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  document.getElementById('sheet-close').addEventListener('click', () => openSheet(false));
+  bk.addEventListener('click', () => openSheet(false));
+
+  // アクティブな絞り込み数を下部バーに表示
+  function updateFilterCount() {
+    let n = 0;
+    if (state.area) n++; if (state.subarea) n++; if (state.meal) n++; if (state.genre) n++;
+    if (state.budgetMin > 0 || state.budgetMax < BUDGET_MAX) n++;
+    ['fav', 'priv', 'kids', 'parking', 'visited', 'showHidden'].forEach(k => { if (state[k]) n++; });
+    if (state.q) n++;
+    const el = document.getElementById('fcount');
+    el.textContent = n; el.classList.toggle('on', n > 0);
+  }
 
   // ---- 店追加・編集フォーム ----
   const addModal = document.getElementById('add-modal');
