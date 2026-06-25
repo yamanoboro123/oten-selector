@@ -1,5 +1,5 @@
 // 自動生成ファイル。手で編集しないこと（node build.mjs で再生成される）
-// generated: 2026-06-25T10:59:14.627Z
+// generated: 2026-06-25T21:16:55.161Z
 window.SHOP_DATA = [
   {
     "slug": "Patisserie Cafe こんま亭",
@@ -18311,7 +18311,7 @@ window.SHOP_DATA = [
     "lunch": false,
     "dinner": true,
     "takeout": false,
-    "smoking": "",
+    "smoking": "分煙",
     "reservation": "",
     "station_walk": "JR「名古屋駅」広小路口から徒歩約3分",
     "address": "愛知県名古屋市中村区名駅4-26-8 日本生命名駅ビル B1F",
@@ -18320,12 +18320,12 @@ window.SHOP_DATA = [
       "家族"
     ],
     "rating": null,
-    "tabelog_score": null,
+    "tabelog_score": 3.04,
     "favorite": false,
     "visited": false,
     "last_visit": "",
     "visits": [],
-    "url": "https://tabelog.com/aichi/A2301/A230101/23071373/",
+    "url": "https://tabelog.com/aichi/A2301/A230101/23082475/",
     "tel": "050-5597-5120",
     "tags": [
       "スタイリッシュ",
