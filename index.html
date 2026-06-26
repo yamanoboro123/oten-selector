@@ -143,7 +143,7 @@
 </head>
 <body>
 <header>
-  <h1>お店セレクター <span class="ver">build 2026-06-25 23:40</span></h1>
+  <h1>お店セレクター <span class="ver">build 2026-06-26 02:54</span></h1>
   <div class="count" id="count">読み込み中…</div>
   <div class="filters" id="filters">
     <div class="sheet-head"><span>絞り込み</span><button class="mini-btn" id="sheet-close">閉じる</button></div>
@@ -180,6 +180,7 @@
 
 <main>
   <div class="grid" id="grid"></div>
+  <div id="sentinel" style="height:1px"></div>
   <div class="empty" id="empty" style="display:none">条件に合うお店がありません。</div>
 </main>
 
@@ -375,18 +376,39 @@
     </div>`;
   }
 
+  // ---- 段階描画（初期は数十件→スクロールで追加読込。マップiframe多数による初期重量化を回避）----
+  const PAGE_SIZE = 24;
+  let currentList = [], shown = 0;
+  function appendChunk() {
+    const next = currentList.slice(shown, shown + PAGE_SIZE);
+    document.getElementById('grid').insertAdjacentHTML('beforeend', next.map(x => card(x.s, x.e)).join(''));
+    shown += next.length;
+    document.getElementById('sentinel').style.visibility = shown < currentList.length ? 'visible' : 'hidden';
+  }
+  // sentinelがビューポート近くに居る限りチャンクを追加（短い画面でも埋める／スクロール追従）
+  function fillIfNeeded() {
+    const s = document.getElementById('sentinel');
+    let guard = 0;
+    while (shown < currentList.length && guard++ < 60) {
+      if (s.getBoundingClientRect().top > window.innerHeight + 600) break;
+      appendChunk();
+    }
+  }
   function render() {
-    const list = shops.map(s => ({ s, e: effective(s) })).filter(x => matches(x.s, x.e));
-    list.sort((a, b) => (a.s.hide === b.s.hide) ? 0 : (a.s.hide ? 1 : -1));
-    const grid = document.getElementById('grid');
-    const empty = document.getElementById('empty');
-    grid.innerHTML = list.map(x => card(x.s, x.e)).join('');
-    empty.style.display = list.length ? 'none' : 'block';
+    currentList = shops.map(s => ({ s, e: effective(s) })).filter(x => matches(x.s, x.e));
+    currentList.sort((a, b) => (a.s.hide === b.s.hide) ? 0 : (a.s.hide ? 1 : -1));
+    shown = 0;
+    document.getElementById('grid').innerHTML = '';
+    appendChunk(); fillIfNeeded();
+    document.getElementById('empty').style.display = currentList.length ? 'none' : 'block';
     const hiddenCount = shops.filter(s => s.hide).length;
     document.getElementById('count').textContent =
-      `表示 ${list.length} 件 / 全 ${shops.length} 件（非掲載 ${hiddenCount} 件）`;
+      `表示 ${currentList.length} 件 / 全 ${shops.length} 件（非掲載 ${hiddenCount} 件）`;
     if (typeof updateFilterCount === 'function') updateFilterCount();
   }
+  // sentinelが見えたら次のチャンクを追加
+  new IntersectionObserver(es => { if (es[0].isIntersecting) fillIfNeeded(); },
+    { rootMargin: '600px' }).observe(document.getElementById('sentinel'));
 
   // ---- カード内アクション（イベント委譲）----
   document.getElementById('grid').addEventListener('click', e => {
